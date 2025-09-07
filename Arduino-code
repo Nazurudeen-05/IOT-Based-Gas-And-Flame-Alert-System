@@ -1,0 +1,164 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// Set the LCD address to 0x27 for a 16 chars and 2 line display
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+
+const int FIRE_SEN = 2;
+const int GAS_SEN = 3;
+const int BUZ = 13;
+
+char fire_sen_flag, gas_sen_flag;
+
+char flag1 = 0, flag2 = 0;
+
+/////////////
+
+char mob_no[] = "6374710301", q;
+
+char at_flag, echo_flag, net_flag;
+
+void gsm_init(void);
+void send_sms(char mode2);
+
+void setup()
+{
+ Serial.begin(9600);
+ 
+ pinMode(FIRE_SEN, INPUT);
+ pinMode(GAS_SEN, INPUT);
+ pinMode(BUZ, OUTPUT); digitalWrite(BUZ,  LOW);
+
+ // initialize the LCD
+ lcd.begin();
+
+ // Turn on the blacklight and print a message.
+ lcd.backlight();
+ 
+ delay(100);
+
+ lcd.setCursor(0, 0); lcd.print("IOT BASED GAS & ");
+ lcd.setCursor(0, 1); lcd.print("FLAME ALERT SYST");
+
+ delay(2000);
+
+ gsm_init();
+ send_sms(4);
+}
+
+void loop()
+{
+  if(digitalRead(FIRE_SEN) ==  LOW){ delay(10); if(digitalRead(FIRE_SEN) ==  LOW){ delay(10); if(digitalRead(FIRE_SEN) ==  LOW){ fire_sen_flag = 0; } } }
+  if(digitalRead(FIRE_SEN) == HIGH){ delay(10); if(digitalRead(FIRE_SEN) == HIGH){ delay(10); if(digitalRead(FIRE_SEN) == HIGH){ flag1 = 0; fire_sen_flag = 1; } } }
+
+  if(digitalRead(GAS_SEN) ==  LOW){ delay(10); if(digitalRead(GAS_SEN) ==  LOW){ delay(10); if(digitalRead(GAS_SEN) ==  LOW){ gas_sen_flag = 0; } } }
+  if(digitalRead(GAS_SEN) == HIGH){ delay(10); if(digitalRead(GAS_SEN) == HIGH){ delay(10); if(digitalRead(GAS_SEN) == HIGH){ flag2 = 0; gas_sen_flag = 1; } } }
+
+  //Serial.write(fire_sen_flag+48); Serial.write(gas_sen_flag+48); Serial.println();
+
+  lcd.setCursor(0, 0); //lcd.print("Fire: NORMAL    ");
+  lcd.print("Fire: ");
+  if(fire_sen_flag == 1)lcd.print("NORMAL    ");else lcd.print("DANGER    ");
+                       
+  lcd.setCursor(0, 1); //lcd.print("Gas : NORMAL    ");
+  lcd.print("Gas : ");
+  if(gas_sen_flag == 1)lcd.print("NORMAL    ");else lcd.print("DANGER    ");
+
+  if( (fire_sen_flag == 1) && (gas_sen_flag == 1) )digitalWrite(BUZ,  LOW);else digitalWrite(BUZ, HIGH);
+
+ 
+  if(fire_sen_flag == 0)
+  {
+   if(flag1 == 0)
+   {
+    send_sms(1);
+   
+    flag1 = 1;
+   }    
+  }
+
+  if(gas_sen_flag == 0)
+  {
+   if(flag2 == 0)
+   {
+    send_sms(2);
+   
+    flag2 = 1;
+   }    
+  }
+
+  delay(100);
+}
+
+ void gsm_init(void)
+ {
+  at_flag = 1;
+ 
+  while(at_flag)
+  {
+   Serial.println("AT");
+   while(Serial.available()>0)
+   {
+    if(Serial.find("OK"))at_flag=0;
+   }
+   delay(1000);
+  }
+   
+  delay(500);
+
+  echo_flag = 1;  
+ 
+  while(echo_flag)
+  {
+   Serial.println("ATE0");
+   while(Serial.available()>0)
+   {
+    if(Serial.find("OK"))echo_flag=0;
+   }
+   delay(1000);
+  }  
+ 
+  delay(500);
+ 
+  net_flag = 1;
+ 
+  while(net_flag)
+  {
+   Serial.println("AT+CPIN?");
+   while(Serial.available()>0)
+   {
+    if(Serial.find("+CPIN: READY"))net_flag = 0;
+   }
+   delay(1000);
+  }
+
+  delay(500);
+ }
+
+ void send_sms(char mode2)
+ {
+  Serial.print("AT+CMGF=1\r\n"); delay(500);
+  //Serial.print("AT+CNMI=2,2,0,0,0\r\n"); delay(500);
+
+  Serial.print("AT+CMGS="); Serial.write('"'); for(q = 0; q <= 9; q++)Serial.write(mob_no[q]); Serial.write('"'); Serial.print("\r\n"); delay(500);
+ 
+  if(mode2 >= 1 && mode2 <= 2)
+  {
+        if(mode2 == 1)Serial.println("Fire detected..");
+   else if(mode2 == 2)Serial.println("Gas detected..");
+   
+   Serial.println("Need help, save me as soon as possible..");
+   
+   Serial.println("Location:");
+
+   Serial.println("https://www.google.com/maps/search/Vel+Tech+hi+tech/@13.1827715,80.08513,15z/data=!3m1!4b1?entry=ttu");
+  }
+  else if(mode2 == 4)Serial.print("Welcome...\r\n");
+       
+  delay(500);
+ 
+  Serial.write(26);
+ 
+  delay(2000);
+ }
